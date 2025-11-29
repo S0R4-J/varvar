@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dungeon & Stone Wiki</title>
+    <!-- Шрифты -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Иконки -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Стили -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Фон с анимацией -->
+    <div id="petals-container"></div>
+
+    <!-- Хедер -->
+    <header class="wiki-header">
+        <div class="logo-area">
+            <div class="logo-icon">🛡️</div>
+            <span class="logo-text">D&S <span class="highlight">Wiki</span></span>
+        </div>
+
+        <!-- Поиск -->
+        <div class="search-container">
+            <i class="fa-solid fa-search search-icon"></i>
+            <input type="text" id="searchInput" placeholder="Поиск (персонажи, предметы...)" oninput="app.search()">
+        </div>
+
+        <!-- Управление -->
+        <div class="controls">
+            <button class="theme-btn" onclick="app.toggleTheme()" title="Сменить тему">
+                <i class="fa-solid fa-moon"></i>
+            </button>
+            <button class="add-btn" onclick="app.openAddModal()">
+                <i class="fa-solid fa-plus"></i> <span>Добавить</span>
+            </button>
+            <button class="reset-btn" onclick="app.resetDB()" title="Сброс базы данных">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Фильтры -->
+    <nav class="filter-nav">
+        <button class="filter-btn active" onclick="app.filter('all')">Все</button>
+        <button class="filter-btn" onclick="app.filter('character')">Персонажи</button>
+        <button class="filter-btn" onclick="app.filter('monster')">Монстры</button>
+        <button class="filter-btn" onclick="app.filter('item')">Предметы</button>
+        <button class="filter-btn" onclick="app.filter('essence')">Эссенции</button>
+    </nav>
+
+    <!-- Контент -->
+    <main class="main-content">
+        <div id="stats-bar" class="stats-bar">
+            <!-- Сюда выводится статистика JS -->
+        </div>
+
+        <div id="card-grid" class="grid-container">
+            <!-- Карточки генерируются JS -->
+        </div>
+    </main>
+
+    <!-- Модальное окно (Просмотр/Редактирование) -->
+    <div id="modal-overlay" class="modal-overlay" onclick="app.closeModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+            <button class="close-modal" onclick="app.closeModal()">&times;</button>
+            
+            <div class="modal-top">
+                <!-- Фото -->
+                <div class="modal-img-wrapper">
+                    <img id="m-img" src="" alt="Avatar">
+                    <div class="edit-overlay" onclick="document.getElementById('m-img-input').focus()">
+                        <i class="fa-solid fa-camera"></i>
+                    </div>
+                </div>
+                
+                <!-- Заголовки -->
+                <div class="modal-header-inputs">
+                    <input type="text" id="m-img-input" class="edit-input hidden" placeholder="Ссылка на изображение...">
+                    <h2 id="m-name" contenteditable="false">Имя</h2>
+                    <p id="m-subtitle" contenteditable="false">Подзаголовок</p>
+                    <div class="tags">
+                        <span class="tag status-tag" id="m-status" contenteditable="false">Статус</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-body">
+                <!-- Описание -->
+                <div class="section">
+                    <label>Описание</label>
+                    <div id="m-desc" class="editable-area" contenteditable="false"></div>
+                </div>
+                
+                <!-- Характеристики -->
+                <div class="section">
+                    <label>Характеристики <span class="blue-emoji">📊</span></label>
+                    <div id="m-details" class="details-grid">
+                        <!-- Детали генерируются JS -->
+                    </div>
+                    <button id="add-detail-btn" class="small-btn hidden" onclick="app.addDetailField()">+ Добавить поле</button>
+                </div>
+            </div>
+
+            <!-- Кнопки действий -->
+            <div class="modal-footer">
+                <button id="btn-edit" class="action-btn primary" onclick="app.toggleEditMode()">✏️ Редактировать</button>
+                <button id="btn-save" class="action-btn success hidden" onclick="app.saveEntry()">💾 Сохранить</button>
+                <button id="btn-delete" class="action-btn danger hidden" onclick="app.deleteEntry()">🗑️ Удалить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключение скриптов -->
+    <script src="js/database.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
