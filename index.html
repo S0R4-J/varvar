@@ -4,118 +4,169 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dungeon & Stone Wiki</title>
-    <!-- Шрифты -->
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <!-- Иконки -->
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Стили -->
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-    <!-- Фон с анимацией -->
-    <div id="petals-container"></div>
+    <!-- Эффект снега -->
+    <div id="snow-container"></div>
 
     <!-- Хедер -->
     <header class="wiki-header">
-        <div class="logo-area">
-            <div class="logo-icon">🛡️</div>
-            <span class="logo-text">D&S <span class="highlight">Wiki</span></span>
+        <div class="header-left">
+            <div class="logo-area">
+                <i class="fa-solid fa-skull logo-icon"></i>
+                <div class="logo-text">D&S <span class="highlight">Wiki</span></div>
+            </div>
         </div>
 
-        <!-- Поиск -->
         <div class="search-container">
             <i class="fa-solid fa-search search-icon"></i>
-            <input type="text" id="searchInput" placeholder="Поиск (персонажи, предметы...)" oninput="app.search()">
+            <input type="text" id="searchInput" placeholder="Поиск..." oninput="app.search()">
         </div>
 
-        <!-- Управление -->
-        <div class="controls">
-            <button class="theme-btn" onclick="app.toggleTheme()" title="Сменить тему">
-                <i class="fa-solid fa-moon"></i>
+        <div class="header-controls">
+            <!-- Кнопка админа (Добавить) -->
+            <button id="add-btn" class="icon-btn hidden admin-only" onclick="app.openAddModal()" title="Добавить">
+                <i class="fa-solid fa-plus"></i>
             </button>
-            <button class="add-btn" onclick="app.openAddModal()">
-                <i class="fa-solid fa-plus"></i> <span>Добавить</span>
-            </button>
-            <button class="reset-btn" onclick="app.resetDB()" title="Сброс базы данных">
+
+            <button class="icon-btn" onclick="app.resetDB()" title="Сброс">
                 <i class="fa-solid fa-rotate-right"></i>
             </button>
+
+            <!-- Профиль / Вход -->
+            <div class="profile-menu">
+                <button class="icon-btn profile-btn" onclick="app.toggleProfileMenu()">
+                    <i class="fa-solid fa-user"></i>
+                </button>
+                <div id="profile-dropdown" class="dropdown-menu hidden">
+                    <div id="user-info" class="dropdown-header">Гость</div>
+                    <div class="dropdown-divider"></div>
+                    <a href="#" onclick="app.openLoginModal()" id="login-link"><i class="fa-solid fa-right-to-bracket"></i> Вход</a>
+                    <a href="#" onclick="app.openAdminPanel()" id="admin-link" class="hidden admin-only"><i class="fa-solid fa-gear"></i> Админка</a>
+                    <a href="#" onclick="app.logout()" id="logout-link" class="hidden"><i class="fa-solid fa-right-from-bracket"></i> Выход</a>
+                </div>
+            </div>
         </div>
     </header>
 
-    <!-- Фильтры -->
+    <!-- Навигация -->
     <nav class="filter-nav">
-        <button class="filter-btn active" onclick="app.filter('all')">Все</button>
-        <button class="filter-btn" onclick="app.filter('character')">Персонажи</button>
-        <button class="filter-btn" onclick="app.filter('monster')">Монстры</button>
-        <button class="filter-btn" onclick="app.filter('item')">Предметы</button>
-        <button class="filter-btn" onclick="app.filter('essence')">Эссенции</button>
+        <button class="filter-btn active" onclick="app.filter('all')"><i class="fa-solid fa-globe"></i> Все</button>
+        <button class="filter-btn" onclick="app.filter('character')"><i class="fa-solid fa-user-ninja"></i> Персонажи</button>
+        <button class="filter-btn" onclick="app.filter('monster')"><i class="fa-solid fa-dragon"></i> Монстры</button>
+        <button class="filter-btn" onclick="app.filter('item')"><i class="fa-solid fa-khanda"></i> Предметы</button>
+        <button class="filter-btn" onclick="app.filter('essence')"><i class="fa-regular fa-gem"></i> Эссенции</button>
     </nav>
 
     <!-- Контент -->
     <main class="main-content">
-        <div id="stats-bar" class="stats-bar">
-            <!-- Сюда выводится статистика JS -->
-        </div>
-
-        <div id="card-grid" class="grid-container">
-            <!-- Карточки генерируются JS -->
-        </div>
+        <div class="stats-bar" id="stats-bar"></div>
+        <div id="card-grid" class="grid-container"></div>
     </main>
 
-    <!-- Модальное окно (Просмотр/Редактирование) -->
+    <!-- Модальное окно (Карточка) -->
     <div id="modal-overlay" class="modal-overlay" onclick="app.closeModal()">
         <div class="modal-card" onclick="event.stopPropagation()">
-            <button class="close-modal" onclick="app.closeModal()">&times;</button>
+            <button class="close-modal-btn" onclick="app.closeModal()">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
             
-            <div class="modal-top">
-                <!-- Фото -->
-                <div class="modal-img-wrapper">
-                    <img id="m-img" src="" alt="Avatar">
-                    <div class="edit-overlay" onclick="document.getElementById('m-img-input').focus()">
-                        <i class="fa-solid fa-camera"></i>
+            <div class="modal-content-wrapper">
+                <div class="modal-left">
+                    <div class="image-upload-container">
+                        <img id="m-img" src="" alt="Image" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                        <div class="icon-fallback" id="m-icon-fallback"><i class="fa-solid fa-box"></i></div>
+                        
+                        <!-- Загрузка файла (только админ) -->
+                        <label for="file-upload" class="upload-overlay admin-only hidden">
+                            <i class="fa-solid fa-camera"></i>
+                        </label>
+                        <input type="file" id="file-upload" class="hidden" accept="image/*" onchange="app.handleImageUpload(this)">
+                    </div>
+                    <div class="tags-container" id="m-tags">
+                        <span class="tag" id="m-status">Статус</span>
                     </div>
                 </div>
-                
-                <!-- Заголовки -->
-                <div class="modal-header-inputs">
-                    <input type="text" id="m-img-input" class="edit-input hidden" placeholder="Ссылка на изображение...">
-                    <h2 id="m-name" contenteditable="false">Имя</h2>
-                    <p id="m-subtitle" contenteditable="false">Подзаголовок</p>
-                    <div class="tags">
-                        <span class="tag status-tag" id="m-status" contenteditable="false">Статус</span>
+
+                <div class="modal-right">
+                    <div class="modal-header-text">
+                        <h2 id="m-name" contenteditable="false">Имя</h2>
+                        <p id="m-subtitle" contenteditable="false">Подзаголовок</p>
+                    </div>
+
+                    <div class="info-section">
+                        <h4 class="section-title"><i class="fa-solid fa-book-open"></i> Описание</h4>
+                        <div id="m-desc" class="editable-text" contenteditable="false"></div>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h4 class="section-title"><i class="fa-solid fa-chart-simple"></i> Характеристики</h4>
+                        <div id="m-details" class="details-grid"></div>
+                        <button id="add-detail-btn" class="small-btn hidden admin-only" onclick="app.addDetailField()">+ Поле</button>
                     </div>
                 </div>
             </div>
 
-            <div class="modal-body">
-                <!-- Описание -->
-                <div class="section">
-                    <label>Описание</label>
-                    <div id="m-desc" class="editable-area" contenteditable="false"></div>
-                </div>
-                
-                <!-- Характеристики -->
-                <div class="section">
-                    <label>Характеристики <span class="blue-emoji">📊</span></label>
-                    <div id="m-details" class="details-grid">
-                        <!-- Детали генерируются JS -->
-                    </div>
-                    <button id="add-detail-btn" class="small-btn hidden" onclick="app.addDetailField()">+ Добавить поле</button>
-                </div>
-            </div>
-
-            <!-- Кнопки действий -->
-            <div class="modal-footer">
-                <button id="btn-edit" class="action-btn primary" onclick="app.toggleEditMode()">✏️ Редактировать</button>
-                <button id="btn-save" class="action-btn success hidden" onclick="app.saveEntry()">💾 Сохранить</button>
-                <button id="btn-delete" class="action-btn danger hidden" onclick="app.deleteEntry()">🗑️ Удалить</button>
+            <div class="modal-footer admin-only hidden">
+                <button id="btn-edit" class="action-btn edit-btn" onclick="app.toggleEditMode()">Редактировать</button>
+                <button id="btn-save" class="action-btn save-btn hidden" onclick="app.saveEntry()">Сохранить</button>
+                <button id="btn-delete" class="action-btn delete-btn hidden" onclick="app.deleteEntry()">Удалить</button>
             </div>
         </div>
     </div>
 
-    <!-- Подключение скриптов -->
-    <script src="js/database.js"></script>
+    <!-- Модальное окно Входа (Нормальный вид) -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h2>Вход</h2>
+                <button class="close-auth-btn" onclick="document.getElementById('login-modal').classList.remove('active')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="auth-body">
+                <div class="input-group">
+                    <i class="fa-solid fa-user input-icon"></i>
+                    <input type="text" id="login-user" placeholder="Логин" class="auth-input">
+                </div>
+                <div class="input-group">
+                    <i class="fa-solid fa-lock input-icon"></i>
+                    <input type="password" id="login-pass" placeholder="Пароль" class="auth-input">
+                </div>
+                <button onclick="app.login()" class="auth-submit-btn">Войти</button>
+                <p class="auth-hint">Админ: admin / 123</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Админ Панель -->
+    <div id="admin-panel-modal" class="modal-overlay">
+        <div class="admin-panel-card">
+            <div class="auth-header">
+                <h3><i class="fa-solid fa-gear"></i> Настройки</h3>
+                <button class="close-auth-btn" onclick="document.getElementById('admin-panel-modal').classList.remove('active')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="admin-setting">
+                <label>Текущая Глава:</label>
+                <input type="number" id="config-chapter" onchange="app.updateConfig('chapter', this.value)">
+            </div>
+
+            <div class="admin-setting">
+                <label>Лимит записей:</label>
+                <input type="number" id="config-limit" onchange="app.updateConfig('limit', this.value)">
+            </div>
+
+            <div class="admin-setting checkbox-setting">
+                <label for="config-debug">Режим отладки</label>
+                <input type="checkbox" id="config-debug" onchange="app.updateConfig('debug', this.checked)">
+            </div>
+        </div>
+    </div>
+
+    <script src="js/db_init.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

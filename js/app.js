@@ -1,136 +1,249 @@
 const DB_KEY = 'ds_wiki_data';
+const CONFIG_KEY = 'ds_wiki_config';
+const USER_KEY = 'ds_wiki_user';
 
 const app = {
     data: [],
-    
+    config: { chapter: 172, limit: 100, debug: false },
+    user: null, // null, 'user', 'admin'
+
     init() {
-        // Инициализация БД
-        if (typeof initDatabase === 'function') initDatabase();
+        this.loadConfig();
+        this.loadUser();
         this.loadData();
+        // Всегда темная тема
+        document.body.classList.add('dark-mode');
         this.render(this.data);
-        this.setupTheme();
-        this.animatePetals();
-        this.updateStats();
+        this.initSnowEffect();
     },
 
+    // --- КОНФИГУРАЦИЯ И АДМИНКА ---
+    loadConfig() {
+        const saved = localStorage.getItem(CONFIG_KEY);
+        if (saved) this.config = JSON.parse(saved);
+        const chInput = document.getElementById('config-chapter');
+        const limInput = document.getElementById('config-limit');
+        const debInput = document.getElementById('config-debug');
+        if(chInput) chInput.value = this.config.chapter;
+        if(limInput) limInput.value = this.config.limit;
+        if(debInput) debInput.checked = this.config.debug;
+    },
+
+    updateConfig(key, value) {
+        if(key === 'debug') value = !!value;
+        else value = parseInt(value);
+        
+        this.config[key] = value;
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(this.config));
+        this.render(this.data);
+    },
+
+    openAdminPanel() {
+        document.getElementById('profile-dropdown').classList.add('hidden');
+        document.getElementById('admin-panel-modal').classList.add('active');
+    },
+
+    // --- АВТОРИЗАЦИЯ (ЛК) ---
+    loadUser() {
+        const savedUser = localStorage.getItem(USER_KEY);
+        if(savedUser) this.setUser(JSON.parse(savedUser));
+    },
+
+    openLoginModal() {
+        document.getElementById('profile-dropdown').classList.add('hidden');
+        document.getElementById('login-modal').classList.add('active');
+    },
+
+    login() {
+        const u = document.getElementById('login-user').value;
+        const p = document.getElementById('login-pass').value;
+
+        if(u === 'admin' && p === '123') {
+            this.setUser({ name: 'Администратор', role: 'admin' });
+            document.getElementById('login-modal').classList.remove('active');
+        } else if(u && p) {
+            this.setUser({ name: u, role: 'user' });
+            document.getElementById('login-modal').classList.remove('active');
+        } else {
+            alert('Пожалуйста, введите данные');
+        }
+    },
+
+    logout() {
+        this.user = null;
+        localStorage.removeItem(USER_KEY);
+        this.updateUIForUser();
+        document.getElementById('profile-dropdown').classList.add('hidden');
+    },
+
+    setUser(userObj) {
+        this.user = userObj;
+        localStorage.setItem(USER_KEY, JSON.stringify(userObj));
+        this.updateUIForUser();
+    },
+
+    updateUIForUser() {
+        const userInfo = document.getElementById('user-info');
+        const loginLink = document.getElementById('login-link');
+        const logoutLink = document.getElementById('logout-link');
+        const adminLink = document.getElementById('admin-link');
+        const adminElements = document.querySelectorAll('.admin-only');
+
+        if(this.user) {
+            userInfo.innerText = `${this.user.name}`;
+            loginLink.classList.add('hidden');
+            logoutLink.classList.remove('hidden');
+            
+            if(this.user.role === 'admin') {
+                adminLink.classList.remove('hidden');
+                adminElements.forEach(el => el.classList.remove('hidden'));
+            } else {
+                adminLink.classList.add('hidden');
+                adminElements.forEach(el => el.classList.add('hidden'));
+            }
+        } else {
+            userInfo.innerText = 'Гость';
+            loginLink.classList.remove('hidden');
+            logoutLink.classList.add('hidden');
+            adminLink.classList.add('hidden');
+            adminElements.forEach(el => el.classList.add('hidden'));
+        }
+    },
+
+    toggleProfileMenu() {
+        document.getElementById('profile-dropdown').classList.toggle('hidden');
+    },
+
+    // --- ДАННЫЕ И РЕНДЕР ---
     loadData() {
         const raw = localStorage.getItem(DB_KEY);
         this.data = raw ? JSON.parse(raw) : [];
     },
 
-    saveData() {
-        localStorage.setItem(DB_KEY, JSON.stringify(this.data));
-        this.render(this.data);
-        this.updateStats();
-    },
-
-    resetDB() {
-        if(confirm('Сбросить базу данных до исходного состояния? Все ваши изменения будут потеряны.')) {
-            localStorage.removeItem(DB_KEY);
-            location.reload();
-        }
-    },
-
-    // Рендеринг
     render(items) {
         const grid = document.getElementById('card-grid');
         grid.innerHTML = '';
+        
+        let displayItems = items.slice(0, this.config.limit);
 
-        if (items.length === 0) {
-            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:var(--text-sec); margin-top:20px;">Ничего не найдено...</div>';
-            return;
-        }
-
-        items.forEach((item, index) => {
+        displayItems.forEach(item => {
             const card = document.createElement('div');
             card.className = 'card';
-            card.style.animationDelay = `${Math.min(index * 0.05, 1)}s`; // Лимит задержки
             card.onclick = () => this.openModal(item.id);
 
-            let typeIcon = '📦';
-            if(item.type === 'character') typeIcon = '👤';
-            if(item.type === 'monster') typeIcon = '🐲';
-            if(item.type === 'essence') typeIcon = '💎';
+            let imageContent;
+            if(item.img) {
+                imageContent = `<img src="${item.img}" class="card-img" alt="${item.name}">`;
+            } else {
+                const iconClass = this.getFallbackIcon(item.type);
+                imageContent = `<div class="card-icon"><i class="${iconClass}"></i></div>`;
+            }
 
             card.innerHTML = `
                 <div class="card-header">
-                    <img src="${item.img || 'https://via.placeholder.com/60'}" class="card-avatar" alt="${item.name}" onerror="this.src='https://via.placeholder.com/60'">
-                    <div class="card-info">
-                        <h3>${item.name} <span class="blue-emoji">${typeIcon}</span></h3>
+                    ${imageContent}
+                    <div class="card-title">
+                        <h3>${item.name}</h3>
                         <span>${item.subtitle}</span>
                     </div>
                 </div>
-                <div class="card-desc">${item.desc}</div>
+                <p style="font-size:0.85rem; color:#888; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.4;">
+                    ${item.desc}
+                </p>
             `;
             grid.appendChild(card);
         });
+
+        document.getElementById('stats-bar').innerText = `DB: ${displayItems.length}/${items.length} (CH ${this.config.chapter})`;
     },
 
-    // Фильтры и Поиск
-    filter(type) {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        event.target.classList.add('active');
-        
-        if (type === 'all') {
-            this.render(this.data);
-        } else {
-            this.render(this.data.filter(i => i.type === type));
+    getFallbackIcon(type) {
+        switch(type) {
+            case 'character': return 'fa-solid fa-user-ninja';
+            case 'monster': return 'fa-solid fa-dragon';
+            case 'item': return 'fa-solid fa-khanda';
+            case 'essence': return 'fa-regular fa-gem';
+            default: return 'fa-solid fa-box';
         }
     },
 
-    search() {
-        const query = document.getElementById('searchInput').value.toLowerCase();
-        const filtered = this.data.filter(item => 
-            item.name.toLowerCase().includes(query) || 
-            item.desc.toLowerCase().includes(query) ||
-            item.subtitle.toLowerCase().includes(query)
-        );
-        this.render(filtered);
+    // --- ЗАГРУЗКА ФАЙЛОВ ---
+    handleImageUpload(input) {
+        const file = input.files[0];
+        if(!file) return;
+
+        // Ограничение размера (например, 1МБ) для оптимизации
+        if(file.size > 1024 * 1024) {
+            alert('Файл слишком большой! Макс 1МБ.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const base64Img = e.target.result;
+            document.getElementById('m-img').src = base64Img;
+            document.getElementById('m-img').style.display = 'block';
+            document.getElementById('m-icon-fallback').style.display = 'none';
+            this.currentImgData = base64Img; 
+        };
+        reader.readAsDataURL(file);
     },
 
-    // Модальное окно
+    // --- МОДАЛКА ---
     currentId: null,
+    currentImgData: null,
 
     openModal(id) {
         const item = this.data.find(i => i.id === id);
         this.currentId = id;
+        this.currentImgData = item.img || null;
+        
         const modal = document.getElementById('modal-overlay');
         
-        // Заполнение
-        document.getElementById('m-img').src = item.img || 'https://via.placeholder.com/150';
-        document.getElementById('m-img-input').value = item.img || '';
         document.getElementById('m-name').innerText = item.name;
         document.getElementById('m-subtitle').innerText = item.subtitle;
         document.getElementById('m-desc').innerText = item.desc;
         document.getElementById('m-status').innerText = item.status || 'Активен';
 
-        // Детали
-        const detailsContainer = document.getElementById('m-details');
-        detailsContainer.innerHTML = '';
+        const imgEl = document.getElementById('m-img');
+        const iconEl = document.getElementById('m-icon-fallback');
+        if(item.img) {
+            imgEl.src = item.img;
+            imgEl.style.display = 'block';
+            iconEl.style.display = 'none';
+        } else {
+            imgEl.style.display = 'none';
+            iconEl.style.display = 'flex';
+            iconEl.innerHTML = `<i class="${this.getFallbackIcon(item.type)}"></i>`;
+        }
+
+        const detailsBox = document.getElementById('m-details');
+        detailsBox.innerHTML = '';
         if(item.details) {
-            Object.entries(item.details).forEach(([key, val]) => {
-                this.addDetailField(key, val);
+            Object.entries(item.details).forEach(([k, v]) => {
+                this.addDetailField(k, v);
             });
         }
 
-        this.toggleEditMode(false); // Всегда открывать в режиме просмотра
+        this.toggleEditMode(false);
         modal.classList.add('active');
     },
 
     openAddModal() {
         this.currentId = 'new_' + Date.now();
+        this.currentImgData = null;
         const modal = document.getElementById('modal-overlay');
         
-        // Очистка
-        document.getElementById('m-img').src = 'https://via.placeholder.com/150?text=New';
-        document.getElementById('m-img-input').value = '';
-        document.getElementById('m-name').innerText = 'Новое Имя';
+        document.getElementById('m-img').style.display = 'none';
+        document.getElementById('m-icon-fallback').style.display = 'flex';
+        document.getElementById('m-icon-fallback').innerHTML = '<i class="fa-solid fa-plus"></i>';
+        
+        document.getElementById('m-name').innerText = 'Новое имя';
         document.getElementById('m-subtitle').innerText = 'Тип / Ранг';
         document.getElementById('m-desc').innerText = 'Описание...';
-        document.getElementById('m-status').innerText = 'Активен';
         document.getElementById('m-details').innerHTML = '';
 
-        this.toggleEditMode(true); // Сразу режим редактирования
+        this.toggleEditMode(true);
         modal.classList.add('active');
     },
 
@@ -138,41 +251,39 @@ const app = {
         document.getElementById('modal-overlay').classList.remove('active');
     },
 
-    // Редактирование
     toggleEditMode(forceState) {
-        const card = document.querySelector('.modal-card');
-        const isEditing = forceState !== undefined ? forceState : !card.classList.contains('is-editing');
+        const modal = document.getElementById('modal-overlay');
+        const isEditing = forceState !== undefined ? forceState : !modal.classList.contains('editing');
         
         const contentEditableElements = ['m-name', 'm-subtitle', 'm-desc', 'm-status'];
         
-        if (isEditing) {
-            card.classList.add('is-editing');
+        if(isEditing) {
+            modal.classList.add('editing');
             contentEditableElements.forEach(id => document.getElementById(id).contentEditable = "true");
-            document.getElementById('m-img-input').classList.remove('hidden');
             document.getElementById('btn-edit').classList.add('hidden');
             document.getElementById('btn-save').classList.remove('hidden');
             document.getElementById('btn-delete').classList.remove('hidden');
             document.getElementById('add-detail-btn').classList.remove('hidden');
+            document.querySelector('.upload-overlay').classList.remove('hidden');
             
-            // Делаем детали редактируемыми
             document.querySelectorAll('.detail-key, .detail-val').forEach(el => el.contentEditable = "true");
         } else {
-            card.classList.remove('is-editing');
+            modal.classList.remove('editing');
             contentEditableElements.forEach(id => document.getElementById(id).contentEditable = "false");
-            document.getElementById('m-img-input').classList.add('hidden');
             document.getElementById('btn-edit').classList.remove('hidden');
             document.getElementById('btn-save').classList.add('hidden');
             document.getElementById('btn-delete').classList.add('hidden');
             document.getElementById('add-detail-btn').classList.add('hidden');
+            document.querySelector('.upload-overlay').classList.add('hidden');
         }
     },
 
-    addDetailField(key = 'Параметр', val = 'Значение') {
+    addDetailField(k = 'Параметр', v = 'Значение') {
         const div = document.createElement('div');
         div.className = 'detail-item';
         div.innerHTML = `
-            <b class="detail-key" contenteditable="${document.querySelector('.modal-card').classList.contains('is-editing')}">${key}</b>
-            <div class="detail-val" contenteditable="${document.querySelector('.modal-card').classList.contains('is-editing')}">${val}</div>
+            <span class="detail-label detail-key" contenteditable="${document.getElementById('modal-overlay').classList.contains('editing')}">${k}</span>
+            <span class="detail-val" contenteditable="${document.getElementById('modal-overlay').classList.contains('editing')}">${v}</span>
         `;
         document.getElementById('m-details').appendChild(div);
     },
@@ -180,94 +291,88 @@ const app = {
     saveEntry() {
         const name = document.getElementById('m-name').innerText;
         const subtitle = document.getElementById('m-subtitle').innerText;
-        const desc = document.getElementById('m-desc').innerText;
-        const status = document.getElementById('m-status').innerText;
-        const img = document.getElementById('m-img-input').value || 'https://via.placeholder.com/150';
+        
+        let type = 'item';
+        const subLower = subtitle.toLowerCase();
+        if(subLower.includes('варвар') || subLower.includes('маг')) type = 'character';
+        else if(subLower.includes('монстр') || subLower.includes('босс')) type = 'monster';
+        else if(subLower.includes('эссенция')) type = 'essence';
 
-        // Сбор деталей
         const details = {};
         document.querySelectorAll('.detail-item').forEach(item => {
             const k = item.querySelector('.detail-key').innerText;
             const v = item.querySelector('.detail-val').innerText;
-            if(k && v) details[k] = v;
+            if(k) details[k] = v;
         });
 
-        // Автоопределение типа
-        let type = 'item';
-        const subLower = subtitle.toLowerCase();
-        if(subLower.includes('варвар') || subLower.includes('человек') || subLower.includes('эльф') || subLower.includes('зверолюд') || subLower.includes('маг')) type = 'character';
-        else if(subLower.includes('монстр') || subLower.includes('босс')) type = 'monster';
-        else if(subLower.includes('эссенция')) type = 'essence';
-
-        const newObj = {
+        const newItem = {
             id: this.currentId,
-            type, name, subtitle, desc, status, img, details
+            type,
+            name,
+            subtitle,
+            desc: document.getElementById('m-desc').innerText,
+            status: document.getElementById('m-status').innerText,
+            img: this.currentImgData,
+            details
         };
 
-        const existingIndex = this.data.findIndex(i => i.id === this.currentId);
-        if (existingIndex > -1) {
-            this.data[existingIndex] = newObj;
-        } else {
-            this.data.unshift(newObj);
-        }
+        const idx = this.data.findIndex(i => i.id === this.currentId);
+        if(idx > -1) this.data[idx] = newItem;
+        else this.data.unshift(newItem);
 
-        this.saveData();
+        localStorage.setItem(DB_KEY, JSON.stringify(this.data));
+        this.render(this.data);
         this.closeModal();
     },
 
     deleteEntry() {
-        if(confirm('Удалить эту запись навсегда?')) {
+        if(confirm('Удалить запись?')) {
             this.data = this.data.filter(i => i.id !== this.currentId);
-            this.saveData();
+            localStorage.setItem(DB_KEY, JSON.stringify(this.data));
+            this.render(this.data);
             this.closeModal();
         }
     },
 
-    // Темная тема (Yandex style)
-    toggleTheme() {
-        document.body.classList.toggle('dark-mode');
-        const isDark = document.body.classList.contains('dark-mode');
-        localStorage.setItem('ds_theme', isDark ? 'dark' : 'light');
-    },
-
-    setupTheme() {
-        if (localStorage.getItem('ds_theme') === 'dark') {
-            document.body.classList.add('dark-mode');
-        }
-    },
-
-    // Анимация лепестков
-    animatePetals() {
-        const container = document.getElementById('petals-container');
-        const petalCount = 12; // Оптимальное кол-во
-        
-        // Добавляем стили анимации динамически
-        const style = document.createElement('style');
-        style.innerHTML = `
-            @keyframes fall {
-                0% { transform: translateY(-10vh) rotate(0deg); }
-                100% { transform: translateY(110vh) rotate(360deg); }
-            }
-        `;
-        document.head.appendChild(style);
-
-        for(let i=0; i<petalCount; i++) {
-            const p = document.createElement('div');
-            p.className = 'petal';
-            p.style.left = Math.random() * 100 + '%';
-            p.style.animation = `fall ${8 + Math.random() * 10}s linear infinite`;
-            p.style.animationDelay = `-${Math.random() * 10}s`;
-            const size = 5 + Math.random() * 10;
-            p.style.width = `${size}px`;
-            p.style.height = `${size}px`;
-            container.appendChild(p);
-        }
-    },
+    // --- ОБЩИЕ ---
+    // Функция toggleTheme убрана, так как теперь только темная тема
+    toggleTheme() {}, 
+    setupTheme() {}, // Убрана
     
-    updateStats() {
-        const count = this.data.length;
-        const bar = document.getElementById('stats-bar');
-        if(bar) bar.innerHTML = `База данных: <b>${count}</b> записей (Обновлено: Глава 172)`;
+    filter(type) {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        if(type === 'all') this.render(this.data);
+        else this.render(this.data.filter(i => i.type === type));
+    },
+    search() {
+        const q = document.getElementById('searchInput').value.toLowerCase();
+        this.render(this.data.filter(i => i.name.toLowerCase().includes(q)));
+    },
+    resetDB() {
+        if(confirm('Вернуть базу к исходному состоянию?')) {
+            localStorage.removeItem(DB_KEY);
+            location.reload();
+        }
+    },
+
+    // --- ЭФФЕКТ СНЕГА (Оптимизированный CSS) ---
+    initSnowEffect() {
+        const container = document.getElementById('snow-container');
+        const snowCount = 50; // Количество снежинок
+
+        for (let i = 0; i < snowCount; i++) {
+            const snow = document.createElement('div');
+            snow.className = 'snowflake';
+            const size = Math.random() * 3 + 1;
+            snow.style.width = `${size}px`;
+            snow.style.height = `${size}px`;
+            snow.style.left = `${Math.random() * 100}%`;
+            snow.style.animationDuration = `${Math.random() * 3 + 2}s`;
+            snow.style.animationDelay = `${Math.random() * 5}s`;
+            container.appendChild(snow);
+        }
     }
 };
 
